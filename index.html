@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Relay — Callers</title>
+<title>Relay — Finders</title>
 <meta name="theme-color" content="#EDEFEA">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -328,7 +328,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.55}
         <div class="field">
           <label class="lab" for="userInput">Employee ID</label>
           <input type="text" id="userInput" autocomplete="username" autocapitalize="characters"
-                 spellcheck="false" placeholder="SC001" maxlength="12">
+                 spellcheck="false" placeholder="SF001" maxlength="12">
         </div>
         <div class="field">
           <label class="lab" for="pwInput">Password</label>
@@ -474,7 +474,7 @@ function ago(v){
 function show(which){
   ['whoami','app'].forEach(id => $(id).classList.toggle('hidden', id !== which));
 }
-const forcedRole = 'closer';   // this file is the closer entrance
+const forcedRole = 'finder';   // this file is the finder entrance
 
 function greeting(){
   const h = new Date().getHours();
