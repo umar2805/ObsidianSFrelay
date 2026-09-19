@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relay — Callers</title>
+<meta name="theme-color" content="#EDEFEA">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   RELAY — leads pass from the person who finds them to the
+   person who calls them.
+
+   Two sides, two colours. Finders are indigo, closers are
+   green. That is the only place colour carries meaning, so if
+   something on screen is coloured it tells you whose hands the
+   lead is in.
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme:light;
+  --font:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+
+  --ground:#EDEFEA;
+  --sheet:#FBFCFA;
+  --sheet-2:#F4F6F1;
+  --line:#DDE1D8;
+  --line-2:#C9CFC2;
+
+  --ink:#191D19;
+  --ink-2:#5A6157;
+  --ink-3:#848B80;
+
+  --finder:#2B3F94;
+  --finder-wash:#EAEDF8;
+  --closer:#0C6446;
+  --closer-wash:#E6F0EA;
+
+  --amber:#8A5A06;
+  --amber-wash:#F7EFE0;
+  --red:#A63A2E;
+  --red-wash:#F8EBE8;
+
+  --r:10px;
+  --shadow:0 1px 2px rgba(25,29,25,.05), 0 6px 18px rgba(25,29,25,.07);
+}
+*{box-sizing:border-box}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+html,body{height:100%}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--font);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;
+}
+button,input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:4px}
+.hidden{display:none!important}
+
+/* ───── shell ───── */
+.bar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:12px;
+  height:56px;padding:0 18px;
+  background:rgba(237,239,234,.9);backdrop-filter:blur(10px) saturate(160%);
+  border-bottom:1px solid var(--line);
+}
+.mark{font-weight:700;letter-spacing:-.03em;font-size:17px}
+.bar-right{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0}
+.who{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-2);min-width:0}
+.who b{font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:26vw}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}
+.dot.f{background:var(--finder)}
+.dot.c{background:var(--closer)}
+.wrap{max-width:860px;margin:0 auto;padding:24px 18px 110px}
+@media (max-width:600px){.bar{padding:0 14px}.wrap{padding:18px 14px 110px}}
+
+/* ───── buttons ───── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 17px;border-radius:var(--r);font-weight:600;font-size:14px;
+  border:1px solid transparent;white-space:nowrap;
+  transition:background .12s,border-color .12s,transform .08s;
+}
+.btn:active{transform:scale(.99)}
+.btn.solid{background:var(--ink);color:var(--sheet)}
+.btn.solid:hover{background:#2C332C}
+.btn.f{background:var(--finder);color:#fff}
+.btn.f:hover{background:#25357D}
+.btn.c{background:var(--closer);color:#fff}
+.btn.c:hover{background:#0A5439}
+.btn.quiet{background:var(--sheet);border-color:var(--line-2);color:var(--ink)}
+.btn.quiet:hover{border-color:var(--ink-2)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:8px}
+.btn.wide{width:100%;padding:14px 18px;font-size:15px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{color:var(--ink-2);font-size:13px;font-weight:500;text-decoration:underline;text-underline-offset:3px;padding:4px}
+.link:hover{color:var(--ink)}
+
+/* ───── fields ───── */
+label.lab{display:block;font-size:13px;font-weight:600;margin:0 0 6px;color:var(--ink-2)}
+.opt{font-weight:400;color:var(--ink-3)}
+input[type=text],input[type=tel],textarea{
+  width:100%;background:var(--sheet);border:1px solid var(--line-2);
+  border-radius:var(--r);padding:12px 14px;
+  transition:border-color .12s,box-shadow .12s;
+}
+input::placeholder,textarea::placeholder{color:var(--ink-3)}
+input:focus,textarea:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(25,29,25,.09)}
+input:disabled,textarea:disabled{background:var(--sheet-2);color:var(--ink-3)}
+textarea{resize:vertical;min-height:80px;line-height:1.55}
+.field{margin-bottom:14px}
+.err{color:var(--red);font-size:13px;margin:7px 0 0;font-weight:500}
+
+/* ───── gate ───── */
+.gate{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;
+  max-width:520px;margin:0 auto;padding:40px 20px}
+.gate h1{font-size:34px;font-weight:700;letter-spacing:-.035em;margin:0 0 8px;line-height:1.1}
+.gate p.sub{color:var(--ink-2);margin:0 0 28px;max-width:44ch}
+.roles{display:grid;gap:12px}
+.role{
+  text-align:left;background:var(--sheet);border:1px solid var(--line-2);
+  border-radius:14px;padding:20px;display:flex;gap:16px;align-items:flex-start;
+  transition:border-color .14s,box-shadow .14s;
+}
+.role:hover{border-color:var(--ink);box-shadow:var(--shadow)}
+.role .glyph{
+  width:40px;height:40px;border-radius:10px;flex:none;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;
+}
+.role.f .glyph{background:var(--finder-wash);color:var(--finder)}
+.role.c .glyph{background:var(--closer-wash);color:var(--closer)}
+.role b{display:block;font-size:17px;font-weight:600;letter-spacing:-.015em}
+.role small{display:block;color:var(--ink-2);font-size:13.5px;margin-top:3px;line-height:1.45}
+.gate .back{margin-bottom:20px;align-self:flex-start}
+
+/* ───── the door ─────
+   Two panels: a coloured face carrying the board's live number, and
+   a quiet side for your name. The colour tells you which entrance
+   you came through before you've read a word. */
+.door{display:grid;grid-template-columns:1.06fr 1fr;min-height:100dvh}
+.door-face{
+  position:relative;display:flex;align-items:center;padding:56px;overflow:hidden;
+  background:var(--finder);color:#fff;
+}
+.door-face.c{background:var(--closer)}
+/* one soft light source, top-left, so the panel has depth without decoration */
+.door-face::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 8% 0%, rgba(255,255,255,.16), rgba(255,255,255,0) 62%);
+}
+.door-face-in{position:relative;z-index:1;width:100%;max-width:420px}
+.door-mark{
+  font-size:15px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  opacity:.6;margin-bottom:auto;
+}
+.door-live{display:block;margin:52px 0 0}
+.door-n{
+  display:block;font-size:clamp(76px,9vw,128px);font-weight:700;
+  letter-spacing:-.055em;line-height:.88;
+  font-variant-numeric:tabular-nums;
+  animation:doorIn .5s cubic-bezier(.2,.8,.3,1) both;
+}
+.door-n.is-line{font-size:clamp(30px,3.4vw,44px);letter-spacing:-.03em;line-height:1.14;max-width:11ch}
+.door-cap{display:block;font-size:17px;line-height:1.4;opacity:.82;margin-top:14px;max-width:22ch}
+.door-foot{
+  margin:44px 0 0;font-size:13.5px;line-height:1.55;opacity:.58;max-width:30ch;
+  border-top:1px solid rgba(255,255,255,.22);padding-top:16px;
+}
+@keyframes doorIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.door-form{display:flex;align-items:center;padding:56px;background:var(--ground)}
+.door-form-in{width:100%;max-width:370px}
+.door-greet{margin:0 0 6px;font-size:14px;color:var(--ink-3);font-weight:500}
+.door-h{font-size:32px;font-weight:700;letter-spacing:-.035em;margin:0 0 8px;line-height:1.12}
+.door-form .sub{color:var(--ink-2);margin:0 0 24px;max-width:36ch;font-size:14.5px}
+.door-form .field{margin-bottom:12px}
+.door-form input{padding:14px 16px;font-size:16px}
+#userInput{letter-spacing:.09em;font-weight:600;text-transform:uppercase}
+.door-form .back{margin:0 0 26px;display:inline-block}
+
+@media (max-width:860px){
+  .door{grid-template-columns:1fr;min-height:100dvh}
+  .door-face{padding:32px 26px 34px;align-items:flex-start;min-height:auto}
+  .door-face-in{max-width:none}
+  .door-mark{margin-bottom:26px}
+  .door-live{margin-top:0}
+  .door-n{font-size:clamp(62px,19vw,92px)}
+  .door-cap{font-size:15.5px;max-width:26ch}
+  .door-foot{display:none}
+  .door-form{padding:30px 26px 46px;align-items:flex-start}
+  .door-form-in{max-width:none}
+  .door-h{font-size:26px}
+}
+
+/* ───── headline count ───── */
+.headline{margin:0 0 22px}
+.headline .n{font-size:56px;font-weight:700;letter-spacing:-.045em;line-height:1;display:block}
+.headline .n.c{color:var(--closer)}
+.headline .n.f{color:var(--finder)}
+.headline .cap{font-size:15px;color:var(--ink-2);margin-top:4px;display:block}
+@media (max-width:600px){.headline .n{font-size:44px}}
+
+/* ───── tabs ───── */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tab{
+  padding:9px 13px 10px;font-size:14px;font-weight:600;color:var(--ink-3);
+  border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;flex:none;
+}
+.tab b{font-weight:600;margin-left:7px;font-size:12px;padding:2px 6px;border-radius:5px;
+  background:var(--sheet-2);border:1px solid var(--line);color:var(--ink-2)}
+.tab.on{color:var(--ink);border-bottom-color:var(--ink)}
+.tab.on b{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+
+/* ───── cards ───── */
+.card{background:var(--sheet);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{margin:0 0 4px;font-size:19px;font-weight:600;letter-spacing:-.02em}
+.card p.note{margin:0 0 18px;color:var(--ink-2);font-size:13.5px}
+
+.list{display:grid;gap:10px}
+.lead{background:var(--sheet);border:1px solid var(--line);border-radius:12px;
+  padding:15px 16px;position:relative;overflow:hidden}
+.lead::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line-2)}
+.lead.s-claimed::before{background:var(--closer)}
+.lead.s-call_back::before{background:var(--amber)}
+.lead.s-interested::before{background:var(--closer)}
+.lead.s-sold::before{background:var(--closer);width:5px}
+.lead.s-declined::before{background:var(--red)}
+.lead-top{display:flex;align-items:flex-start;gap:12px}
+.lead-name{font-size:16px;font-weight:600;letter-spacing:-.015em;flex:1;min-width:0;word-break:break-word}
+.lead-body{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.phone{font-weight:600;font-size:15px;color:var(--ink);text-decoration:none;
+  border-bottom:1px solid var(--line-2);padding-bottom:1px}
+.phone:hover{border-color:var(--ink)}
+.addr{color:var(--ink-2);font-size:13.5px}
+.trace{margin-top:10px;font-size:12.5px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:4px 10px}
+.pin{
+  display:inline-flex;align-items:center;gap:6px;flex:none;
+  font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;
+  border:1px solid var(--line-2);background:var(--sheet-2);color:var(--ink-2);
+}
+.pin.claimed,.pin.interested{background:var(--closer-wash);border-color:transparent;color:var(--closer)}
+.pin.sold{background:var(--closer);border-color:var(--closer);color:#fff}
+.pin.call_back{background:var(--amber-wash);border-color:transparent;color:var(--amber)}
+.pin.declined{background:var(--red-wash);border-color:transparent;color:var(--red)}
+.lead-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+
+/* ───── thread ───── */
+.thread{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:grid;gap:10px}
+.msg{font-size:13.5px;line-height:1.5}
+.msg .from{font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.msg .from.f{color:var(--finder)}
+.msg .from.c{color:var(--closer)}
+.msg .when{font-weight:400;color:var(--ink-3);font-size:12px}
+.msg .txt{color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+.say{display:flex;gap:8px;margin-top:12px;align-items:flex-start}
+.say textarea{min-height:44px;padding:11px 13px}
+
+/* ───── outcomes ───── */
+.outcomes{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:14px}
+.oc{padding:11px 10px;border-radius:9px;border:1px solid var(--line-2);
+  background:var(--sheet);font-size:13.5px;font-weight:600;text-align:center;
+  transition:border-color .12s,background .12s,color .12s}
+.oc:hover{border-color:var(--ink)}
+.oc.good:hover{background:var(--closer-wash);border-color:var(--closer);color:var(--closer)}
+.oc.warn:hover{background:var(--amber-wash);border-color:var(--amber);color:var(--amber)}
+.oc.bad:hover{background:var(--red-wash);border-color:var(--red);color:var(--red)}
+.oc.on{background:var(--ink);border-color:var(--ink);color:var(--sheet)}
+
+/* ───── empty + skeleton ───── */
+.empty{text-align:center;padding:52px 22px;background:var(--sheet);
+  border:1px dashed var(--line-2);border-radius:14px;color:var(--ink-2);font-size:14px}
+.empty b{display:block;color:var(--ink);font-size:17px;font-weight:600;margin-bottom:6px;letter-spacing:-.015em}
+@keyframes shim{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.sk{display:block;border-radius:6px;
+  background:linear-gradient(90deg,rgba(25,29,25,.05) 25%,rgba(25,29,25,.10) 37%,rgba(25,29,25,.05) 63%);
+  background-size:400% 100%;animation:shim 1.4s ease infinite}
+.sk-lead{background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+
+/* ───── toast ───── */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
+  background:var(--ink);color:var(--sheet);padding:11px 18px;border-radius:999px;
+  font-size:14px;font-weight:500;box-shadow:0 8px 28px rgba(25,29,25,.3);
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:90;
+  max-width:88vw;text-align:center;
+}
+.toast.up{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ───── dupe warning ───── */
+.warn-box{background:var(--amber-wash);border:1px solid rgba(138,90,6,.25);
+  border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.warn-box b{display:block;font-size:14px;margin-bottom:4px;color:var(--amber)}
+.warn-box p{margin:0;font-size:13.5px;color:var(--ink-2)}
+
+.setup{max-width:560px;margin:60px auto;padding:26px;background:var(--sheet);
+  border:1px solid var(--line-2);border-radius:14px}
+.setup h2{margin:0 0 10px;font-size:20px}
+.setup p{color:var(--ink-2);font-size:14px}
+.setup code{background:var(--sheet-2);padding:2px 6px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+
+
+<!-- ══════ THE DOOR ══════ -->
+<section class="door hidden" id="whoami">
+  <div class="door-face" id="doorFace">
+    <div class="door-face-in">
+      <div class="door-mark">Relay</div>
+      <div class="door-live">
+        <span class="door-n" id="doorN">&nbsp;</span>
+        <span class="door-cap" id="doorCap">&nbsp;</span>
+      </div>
+      <p class="door-foot" id="doorFoot"></p>
+    </div>
+  </div>
+  <div class="door-form">
+    <div class="door-form-in">
+      <button class="link back hidden" id="whoamiBack">Back</button>
+      <p class="door-greet" id="doorGreet"></p>
+      <h1 class="door-h" id="doorH">Sign in</h1>
+      <p class="sub" id="whoamiSub"></p>
+
+      <div id="signinFields">
+        <div class="field">
+          <label class="lab" for="userInput">Employee ID</label>
+          <input type="text" id="userInput" autocomplete="username" autocapitalize="characters"
+                 spellcheck="false" placeholder="SC001" maxlength="12">
+        </div>
+        <div class="field">
+          <label class="lab" for="pwInput">Password</label>
+          <input type="password" id="pwInput" autocomplete="current-password" placeholder="••••••••">
+        </div>
+      </div>
+
+      <p class="err hidden" id="whoamiErr"></p>
+      <button class="btn wide" id="doWhoami">Sign in</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ APP ══════ -->
+<div class="hidden" id="app">
+  <header class="bar">
+    <div class="mark">Relay</div>
+    <div class="bar-right">
+      <div class="who" id="who"></div>
+      <button class="link" id="leave">Sign out</button>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="headline"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="panel"></div>
+  </main>
+</div>
+
+<div class="setup hidden" id="setup">
+  <h2>Add your Firebase keys</h2>
+  <p>Open this file in a text editor, find the <code>FIREBASE</code> block near the bottom, and paste in the config from your Firebase project. Everything else is ready to go.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     FIREBASE CONFIG — paste yours here.
+     Firebase console → Project settings → Your apps → Web app.
+     Firestore only. No Authentication needed: people identify
+     themselves by name, the same way The Ledger does.
+     ══════════════════════════════════════════════════════════════ -->
+<script>
+window.FIREBASE = {
+  apiKey:            "AIzaSyDMKA_SIHm3KuVna16tKj15RQQyGZ5_VJk",
+  authDomain:        "relay-6cfb1.firebaseapp.com",
+  projectId:         "relay-6cfb1",
+  storageBucket:     "relay-6cfb1.firebasestorage.app",
+  messagingSenderId: "994460205089",
+  appId:             "1:994460205089:web:ddd5074932197069286360"
+};
+</script>
+
+<!-- Firebase lives in its own module so that if it fails to load — offline,
+     opened straight off the disk, wrong keys — the interface below still
+     runs and can say so, instead of the whole page going dead. -->
+<script type="module">
+  try{
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js");
+    const fs = await import("https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js");
+    const au = await import("https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js");
+    const app = initializeApp(window.FIREBASE);
+    window.FB = {
+      db: fs.getFirestore(app),
+      collection: fs.collection, doc: fs.doc, addDoc: fs.addDoc, updateDoc: fs.updateDoc,
+      onSnapshot: fs.onSnapshot, runTransaction: fs.runTransaction,
+      serverTimestamp: fs.serverTimestamp, arrayUnion: fs.arrayUnion,
+      query: fs.query, orderBy: fs.orderBy,
+      auth: au.getAuth(app),
+      signIn: au.signInWithEmailAndPassword,
+      signOut: au.signOut,
+      onAuthStateChanged: au.onAuthStateChanged
+    };
+    window.dispatchEvent(new Event('fb-ready'));
+  }catch(e){
+    console.error('Firebase failed to load:', e);
+    window.FB_ERROR = e;
+    window.dispatchEvent(new Event('fb-failed'));
+  }
+</script>
+
+<script>
+const FIREBASE = window.FIREBASE;
+let FB = null, db = null, leadsCol = null, fbReady = false;
+
+/* ══════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════ */
+const STATUS = {
+  new:'Waiting', claimed:'Being called', call_back:'Call back',
+  interested:'Interested', sold:'Sold', declined:'Not interested'
+};
+const OUTCOMES = [
+  {k:'interested', label:'Interested',     tone:'good'},
+  {k:'call_back',  label:'Call back',      tone:'warn'},
+  {k:'sold',       label:'Sold',           tone:'good'},
+  {k:'declined',   label:'Not interested', tone:'bad'}
+];
+
+let me = null;          // {role:'finder'|'closer', name}
+let leads = [];
+let ready = false;
+let tab = null;
+let unsub = null;
+let pendingRole = null;
+const openThreads = new Set();
+
+const $ = id => document.getElementById(id);
+const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const digits = s => (s||'').replace(/\D/g,'');
+const wa = p => digits(p) ? 'https://wa.me/' + digits(p) : '#';
+// Names are typed, so match them loosely — "sara" and "Sara " are one person.
+const norm = s => (s||'').trim().toLowerCase();
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('up');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=> t.classList.remove('up'), 2600);
+}
+function ms(v){
+  if(!v) return 0;
+  if(typeof v === 'number') return v;
+  if(v.toMillis) return v.toMillis();
+  return 0;
+}
+function ago(v){
+  const t = ms(v);
+  if(!t) return 'just now';
+  const s = Math.floor((Date.now()-t)/1000);
+  if(s < 60) return 'just now';
+  if(s < 3600) return Math.floor(s/60) + 'm ago';
+  if(s < 86400) return Math.floor(s/3600) + 'h ago';
+  const d = Math.floor(s/86400);
+  if(d === 1) return 'yesterday';
+  if(d < 7) return d + 'd ago';
+  return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SESSION — a name and a role, remembered on this device
+   ══════════════════════════════════════════════════════════════ */
+function show(which){
+  ['whoami','app'].forEach(id => $(id).classList.toggle('hidden', id !== which));
+}
+const forcedRole = 'closer';   // this file is the closer entrance
+
+function greeting(){
+  const h = new Date().getHours();
+  if(h < 12) return 'Good morning';
+  if(h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+const ROLE_COPY = {
+  finder: {
+    heading: 'Who\u2019s finding today?',
+    sub: 'Sign in with the account you were given. Your name goes on every venue you add.',
+    foot: 'Three fields per venue: name, phone, address. Anything else you know goes in the notes, where the caller will read it.',
+    cta: 'Sign in',
+    line: 'The finders\u2019 entrance'
+  },
+  closer: {
+    heading: 'Who\u2019s calling today?',
+    sub: 'Sign in with the account you were given. Your name goes next to every lead you claim.',
+    foot: 'Claim a venue before you ring it. That takes it off everyone else\u2019s pile so nobody gets called twice.',
+    cta: 'Sign in',
+    line: 'The callers\u2019 entrance'
+  }
+};
+
+function paintDoor(){
+  const finder = forcedRole === 'finder';
+  const c = ROLE_COPY[forcedRole];
+  pendingRole = forcedRole;
+
+  $('doorFace').classList.toggle('c', !finder);
+  $('doorGreet').textContent = greeting();
+  $('doorN').textContent = c.line;
+  $('doorN').classList.add('is-line');
+  $('doorCap').textContent = '';
+  $('doorFoot').textContent = c.foot;
+  $('doorH').textContent = c.heading;
+  $('whoamiSub').textContent = c.sub;
+
+  const btn = $('doWhoami');
+  btn.className = 'btn wide ' + (finder ? 'f' : 'c');
+  btn.textContent = 'Sign in';
+
+  show('whoami');
+  setTimeout(()=>{ $('userInput').focus(); $('userInput').select(); }, 40);
+}
+
+function doorError(msg){
+  const e = $('whoamiErr');
+  e.textContent = msg;
+  e.classList.remove('hidden');
+}
+
+// Firebase only understands email addresses, so an employee ID is quietly
+// turned into one. Staff never see or type the domain.
+const ID_DOMAIN = '@relay.local';
+const ID_PREFIX = { finder:'SF', closer:'SC' }[forcedRole];
+const idToEmail = id => id.trim().toLowerCase() + ID_DOMAIN;
+const emailToId = em => (em || '').split('@')[0].toUpperCase();
+
+async function signIn(){
+  const id = $('userInput').value.trim().toUpperCase(), pw = $('pwInput').value;
+  if(!id || !pw){ doorError('Fill in both fields.'); return; }
+  if(!fbReady){ doorError('Still connecting \u2014 give it a second and try again.'); return; }
+
+  // An ID from the other side is a wrong door, not a wrong password — say so.
+  if(!id.startsWith(ID_PREFIX)){
+    doorError(forcedRole === 'finder'
+      ? 'That ID isn\u2019t for this site. Finder IDs start with SF.'
+      : 'That ID isn\u2019t for this site. Caller IDs start with SC.');
+    return;
+  }
+
+  $('whoamiErr').classList.add('hidden');
+  const btn = $('doWhoami'); btn.disabled = true;
+  try{
+    await FB.signIn(FB.auth, idToEmail(id), pw);   // onAuthStateChanged takes it from here
+  }catch(e){
+    doorError(/invalid|wrong|not-found|credential/i.test(e.code || '')
+      ? "That ID and password don\u2019t match an account."
+      : "Couldn\u2019t sign in. Check your connection and try again.");
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+
+// Firebase remembers the session, so people sign in once per device.
+function watchAuth(){
+  FB.onAuthStateChanged(FB.auth, user => {
+    if(!user){
+      me = null; stop();
+      $('pwInput').value = '';
+      paintDoor();
+      return;
+    }
+    $('pwInput').value = '';
+    const id = emailToId(user.email);
+    if(!id.startsWith(ID_PREFIX)){   // signed in on the other site in this browser
+      FB.signOut(FB.auth);
+      return;
+    }
+    me = { role:forcedRole, name:id, uid:user.uid };
+    enter();
+  });
+}
+
+$('doWhoami').onclick = signIn;
+$('pwInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('doWhoami').click(); });
+$('userInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('pwInput').focus(); });
+
+$('leave').onclick = () => FB.signOut(FB.auth);   // onAuthStateChanged returns us to the door
+
+function enter(){
+  tab = me.role === 'finder' ? 'add' : 'pool';
+  $('who').innerHTML = `<span class="dot ${me.role === 'finder' ? 'f' : 'c'}"></span><b>${esc(me.name)}</b>`;
+  show('app');
+  listen();
+  draw();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DATA — one document per lead, so two people saving at the same
+   time can never overwrite each other's work.
+   ══════════════════════════════════════════════════════════════ */
+function listen(){
+  stop();
+  ready = false;
+  if(!fbReady){ $('panel').innerHTML = skeleton(); return; }  // resumes on fb-ready
+  unsub = FB.onSnapshot(FB.query(leadsCol, FB.orderBy('addedAt','desc')), snap => {
+    leads = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    ready = true;
+    draw();
+  }, e => {
+    console.error(e);
+    toast("Lost the connection — changes may not be saving.");
+  });
+}
+function stop(){ if(unsub){ unsub(); unsub = null; } leads = []; ready = false; openThreads.clear(); }
+
+async function addLead(venue, phone, address){
+  await FB.addDoc(leadsCol, {
+    venue, phone, phoneDigits:digits(phone), address,
+    status:'new',
+    addedByName:me.name, addedAt:FB.serverTimestamp(),
+    claimedByName:null, claimedAt:null,
+    thread:[], updatedAt:FB.serverTimestamp()
+  });
+}
+
+// Two closers hitting claim at the same moment: the transaction means
+// exactly one wins and the other is told, instead of both thinking they
+// own it and calling the same venue.
+async function claim(id){
+  try{
+    const holder = await FB.runTransaction(db, async tx => {
+      const ref = FB.doc(db, 'leads', id);
+      const snap = await tx.get(ref);
+      if(!snap.exists()) throw new Error('gone');
+      const d = snap.data();
+      if(d.status !== 'new') return d.claimedByName || 'someone else';
+      tx.update(ref, {
+        status:'claimed', claimedByName:me.name,
+        claimedAt:FB.serverTimestamp(), updatedAt:FB.serverTimestamp()
+      });
+      return null;
+    });
+    if(holder){ toast(`${holder} got to that one first.`); return; }
+    toast('Yours. It moved to your leads.');
+    tab = 'mine'; draw();
+  }catch(e){
+    toast(e.message === 'gone' ? 'That lead was removed.' : "Couldn't claim it — try again.");
+  }
+}
+
+async function release(id){
+  await FB.updateDoc(FB.doc(db, 'leads', id), {
+    status:'new', claimedByName:null, claimedAt:null, updatedAt:FB.serverTimestamp()
+  });
+  toast('Back on the pile for someone else.');
+}
+
+async function setOutcome(id, status){
+  await FB.updateDoc(FB.doc(db, 'leads', id), { status, updatedAt:FB.serverTimestamp() });
+}
+
+async function post(id, text){
+  await FB.updateDoc(FB.doc(db, 'leads', id), {
+    thread: FB.arrayUnion({ author:me.name, role:me.role, text, at:Date.now() }),
+    updatedAt: FB.serverTimestamp()
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VIEWS
+   ══════════════════════════════════════════════════════════════ */
+const pool    = () => leads.filter(l => l.status === 'new');
+const mineC   = () => leads.filter(l => l.status !== 'new' && norm(l.claimedByName) === norm(me.name));
+const mineF   = () => leads.filter(l => norm(l.addedByName) === norm(me.name));
+const working = () => leads.filter(l => l.status !== 'new');
+
+function draw(){
+  if(!me) return;
+  drawHeadline();
+  drawTabs();
+  drawPanel();
+}
+
+function drawHeadline(){
+  const h = $('headline');
+  if(me.role === 'closer'){
+    const n = pool().length;
+    h.innerHTML = `<div class="headline">
+      <span class="n c">${ready ? n : '—'}</span>
+      <span class="cap">${n === 1 ? 'venue waiting to be called' : 'venues waiting to be called'}</span>
+    </div>`;
+  }else{
+    const my = mineF();
+    const sold = my.filter(l => l.status === 'sold').length;
+    const picked = my.filter(l => l.status !== 'new').length;
+    h.innerHTML = `<div class="headline">
+      <span class="n f">${ready ? my.length : '—'}</span>
+      <span class="cap">${my.length === 1 ? 'lead from you' : 'leads from you'}${ready && my.length ? ` · ${picked} picked up · ${sold} sold` : ''}</span>
+    </div>`;
+  }
+}
+
+function drawTabs(){
+  const defs = me.role === 'closer'
+    ? [['pool','The pile',pool().length],['mine','My leads',mineC().length]]
+    : [['add','Add a lead',null],['mine','My leads',mineF().length],['all','Everything',working().length]];
+  $('tabs').innerHTML = defs.map(([k,label,n]) =>
+    `<button class="tab ${tab===k?'on':''}" data-t="${k}">${label}${n===null?'':`<b>${ready?n:'–'}</b>`}</button>`
+  ).join('');
+  $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
+}
+
+function skeleton(n=3){
+  return `<div class="list">${Array.from({length:n}).map((_,i)=>`
+    <div class="sk-lead">
+      <span class="sk" style="width:${46+i*9}%;height:15px;margin-bottom:10px"></span>
+      <span class="sk" style="width:34%;height:12px"></span>
+    </div>`).join('')}</div>`;
+}
+
+function renderPanel(){
+  const p = $('panel');
+
+  if(tab === 'add'){ p.innerHTML = addForm(); wireAddForm(); return; }
+  if(!ready){ p.innerHTML = skeleton(); return; }
+
+  let list, empty;
+  if(tab === 'pool'){
+    list = pool();
+    empty = `<div class="empty"><b>Nothing waiting</b>Every lead has been picked up. New ones appear here the moment someone adds them.</div>`;
+  }else if(tab === 'all'){
+    list = working();
+    empty = `<div class="empty"><b>Nothing being worked yet</b>Leads show up here once a caller picks them up.</div>`;
+  }else if(me.role === 'closer'){
+    list = mineC();
+    empty = `<div class="empty"><b>You haven't claimed anything</b>Open the pile and take the top one.</div>`;
+  }else{
+    list = mineF();
+    empty = `<div class="empty"><b>You haven't added a lead yet</b>Add your first one and it goes straight onto the pile.</div>`;
+  }
+
+  list = list.slice().sort((a,b) => ms(b.updatedAt) - ms(a.updatedAt));
+  p.innerHTML = list.length ? `<div class="list">${list.map(card).join('')}</div>` : empty;
+  wireCards();
+}
+
+// A live update from someone else shouldn't wipe out text being typed.
+function drawPanel(){
+  const a = document.activeElement;
+  if(a && a.tagName === 'TEXTAREA' && a.id.startsWith('say-')) return;
+  if(tab === 'add' && a && a.tagName === 'INPUT' && ['fVenue','fPhone','fAddr'].includes(a.id)) return;
+  renderPanel();
+}
+
+/* ── add form ── */
+function addForm(){
+  return `<div class="card">
+    <h2>New lead</h2>
+    <p class="note">Three fields. It lands on the pile straight away.</p>
+    <div id="dupe"></div>
+    <div class="field">
+      <label class="lab" for="fVenue">Venue name</label>
+      <input type="text" id="fVenue" placeholder="e.g. Cantina do Tejo" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lab" for="fPhone">Phone number</label>
+      <input type="tel" id="fPhone" placeholder="+351 912 345 678" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lab" for="fAddr">Address <span class="opt">— optional</span></label>
+      <input type="text" id="fAddr" placeholder="Street, area" autocomplete="off">
+    </div>
+    <p class="err hidden" id="fErr"></p>
+    <button class="btn f wide" id="fSave">Add to the pile</button>
+  </div>`;
+}
+
+function wireAddForm(){
+  const venue = $('fVenue'), phone = $('fPhone'), addr = $('fAddr'), err = $('fErr'), btn = $('fSave');
+
+  // Flag a number that's already here while they type, not after they save.
+  phone.addEventListener('input', () => {
+    const d = digits(phone.value);
+    const box = $('dupe');
+    if(d.length < 7){ box.innerHTML = ''; return; }
+    const hit = leads.find(l => l.phoneDigits === d);
+    box.innerHTML = hit ? `<div class="warn-box">
+      <b>${esc(hit.venue)} is already here</b>
+      <p>Added by ${esc(hit.addedByName)} ${ago(hit.addedAt)} — ${esc(STATUS[hit.status] || hit.status)}${hit.claimedByName ? `, with ${esc(hit.claimedByName)}` : ''}.</p>
+    </div>` : '';
+  });
+
+  [venue, phone, addr].forEach(el => el.addEventListener('keydown', e => { if(e.key === 'Enter') btn.click(); }));
+
+  btn.onclick = async () => {
+    const v = venue.value.trim(), p = phone.value.trim(), a = addr.value.trim();
+    if(!v){ err.textContent = 'Give the venue a name.'; err.classList.remove('hidden'); venue.focus(); return; }
+    if(digits(p).length < 7){ err.textContent = 'A working phone number is the whole point — add one.'; err.classList.remove('hidden'); phone.focus(); return; }
+    if(leads.some(l => l.phoneDigits === digits(p))){
+      err.textContent = 'That number is already on the pile.'; err.classList.remove('hidden'); return;
+    }
+    err.classList.add('hidden');
+    btn.disabled = true;
+    try{
+      await addLead(v, p, a);
+      venue.value = ''; phone.value = ''; addr.value = '';
+      $('dupe').innerHTML = '';
+      venue.focus();
+      toast(`${v} is on the pile.`);
+    }catch(e){
+      console.error(e);
+      err.textContent = "Couldn't save it. Check your connection and try again.";
+      err.classList.remove('hidden');
+    }finally{
+      btn.disabled = false;
+    }
+  };
+  venue.focus();
+}
+
+/* ── lead card ── */
+function card(l){
+  const isMineC = me.role === 'closer' && norm(l.claimedByName) === norm(me.name);
+  const isMineF = me.role === 'finder' && norm(l.addedByName) === norm(me.name);
+  const canTalk = isMineC || isMineF;
+  const open = openThreads.has(l.id);
+  const n = (l.thread || []).length;
+
+  const trace = [`Found by ${esc(l.addedByName)} ${ago(l.addedAt)}`];
+  if(l.claimedByName) trace.push(`${isMineC ? 'With you' : 'With ' + esc(l.claimedByName)} ${ago(l.claimedAt)}`);
+
+  let actions = '';
+  if(me.role === 'closer' && l.status === 'new'){
+    actions = `<button class="btn c sm" data-act="claim" data-id="${l.id}">Claim and call</button>`;
+  }else if(isMineC){
+    actions = `<button class="btn quiet sm" data-act="release" data-id="${l.id}">Put it back</button>`;
+  }
+
+  const outcomes = isMineC ? `<div class="outcomes">${OUTCOMES.map(o =>
+    `<button class="oc ${o.tone} ${l.status===o.k?'on':''}" data-act="oc" data-id="${l.id}" data-k="${o.k}">${o.label}</button>`
+  ).join('')}</div>` : '';
+
+  const threadBtn = (n || canTalk)
+    ? `<button class="btn quiet sm" data-act="thread" data-id="${l.id}">${open ? 'Hide notes' : (n ? `Notes (${n})` : 'Add a note')}</button>`
+    : '';
+
+  return `<article class="lead s-${l.status}">
+    <div class="lead-top">
+      <div class="lead-name">${esc(l.venue)}</div>
+      <span class="pin ${l.status}">${esc(STATUS[l.status] || l.status)}</span>
+    </div>
+    <div class="lead-body">
+      <a class="phone" href="${wa(l.phone)}" target="_blank" rel="noopener">${esc(l.phone)}</a>
+      ${l.address ? `<span class="addr">${esc(l.address)}</span>` : ''}
+    </div>
+    <div class="trace">${trace.join(' · ')}</div>
+    ${outcomes}
+    ${(actions || threadBtn) ? `<div class="lead-actions">${actions}${threadBtn}</div>` : ''}
+    ${open ? thread(l, canTalk) : ''}
+  </article>`;
+}
+
+function thread(l, canTalk){
+  const msgs = (l.thread || []).slice().sort((a,b) => (a.at||0) - (b.at||0));
+  const body = msgs.length ? msgs.map(m => `<div class="msg">
+      <div class="from ${m.role === 'finder' ? 'f' : 'c'}">${esc(m.author)}<span class="when">${ago(m.at)}</span></div>
+      <div class="txt">${esc(m.text)}</div>
+    </div>`).join('')
+    : `<div class="msg"><div class="txt">No notes yet.</div></div>`;
+
+  const box = canTalk ? `<div class="say">
+      <textarea id="say-${l.id}" rows="1" placeholder="${me.role === 'finder' ? 'Anything the caller should know?' : 'What happened on the call?'}"></textarea>
+      <button class="btn solid sm" data-act="post" data-id="${l.id}">Post</button>
+    </div>` : '';
+
+  return `<div class="thread">${body}${box}</div>`;
+}
+
+function wireCards(){
+  $('panel').querySelectorAll('[data-act]').forEach(b => {
+    const id = b.dataset.id;
+    b.onclick = async () => {
+      const act = b.dataset.act;
+      if(act === 'claim'){ b.disabled = true; await claim(id); }
+      else if(act === 'release'){ b.disabled = true; await release(id); }
+      else if(act === 'oc'){ await setOutcome(id, b.dataset.k); }
+      else if(act === 'thread'){
+        openThreads.has(id) ? openThreads.delete(id) : openThreads.add(id);
+        renderPanel();
+        const ta = $('say-' + id); if(ta) ta.focus();
+      }
+      else if(act === 'post'){
+        const ta = $('say-' + id);
+        const text = ta.value.trim();
+        if(!text) return;
+        b.disabled = true;
+        try{ await post(id, text); ta.value = ''; }
+        catch(e){ toast("Couldn't post that note."); }
+        finally{ b.disabled = false; }
+      }
+    };
+  });
+  $('panel').querySelectorAll('.say textarea').forEach(ta => {
+    ta.addEventListener('keydown', e => {
+      if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
+        e.preventDefault();
+        ta.closest('.say').querySelector('[data-act="post"]').click();
+      }
+    });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STARTUP — the gate works immediately; the pile waits for Firebase
+   ══════════════════════════════════════════════════════════════ */
+function fbProblem(msg){
+  $('whoami').classList.add('hidden');
+  $('app').classList.add('hidden');
+  const box = $('setup');
+  box.classList.remove('hidden');
+  box.innerHTML = msg;
+}
+
+window.addEventListener('fb-ready', () => {
+  FB = window.FB;
+  db = FB.db;
+  leadsCol = FB.collection(db, 'leads');
+  fbReady = true;
+  watchAuth();
+});
+
+window.addEventListener('fb-failed', () => {
+  fbProblem(`<h2>Can't reach Firebase</h2>
+    <p>The database library didn't load. Two usual reasons:</p>
+    <p><b>1.</b> This file was opened straight off the disk. The address bar needs to say
+    <code>http://</code>, not <code>file://</code>. Run <code>python -m http.server 8000</code>
+    in this folder and open <code>http://localhost:8000/relay.html</code>.</p>
+    <p><b>2.</b> The keys are filled in but wrong, or Firestore hasn't been created in that
+    project yet.</p>
+    <p>The browser console (F12) has the exact error.</p>`);
+});
+
+if(forcedRole){
+  paintDoor();   // replaced once auth reports in
+}
+</script>
+</body>
+</html>
