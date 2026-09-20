@@ -499,7 +499,7 @@ body.c-role .tab.on b{background:var(--closer)}
         <div class="field">
           <label class="lab" for="userInput">Employee ID</label>
           <input type="text" id="userInput" autocomplete="username" autocapitalize="characters"
-                 spellcheck="false" placeholder="SF001" maxlength="12">
+                 spellcheck="false" placeholder="FW001" maxlength="12">
         </div>
         <div class="field">
           <label class="lab" for="pwInput">Password</label>
@@ -722,7 +722,7 @@ function leaveSite(){
 // Firebase only understands email addresses, so an employee ID is quietly
 // turned into one. Staff never see or type the domain.
 const ID_DOMAIN = '@relay.local';
-const ID_PREFIX = { finder:'SF', closer:'SC' }[forcedRole];
+const ID_PREFIX = { finder:'FW', closer:'SL' }[forcedRole];   // FW fieldwork, SL second leg
 const idToEmail = id => id.trim().toLowerCase() + ID_DOMAIN;
 const emailToId = em => (em || '').split('@')[0].toUpperCase();
 
@@ -734,8 +734,8 @@ async function signIn(){
   // An ID from the other side is a wrong door, not a wrong password — say so.
   if(!id.startsWith(ID_PREFIX)){
     doorError(forcedRole === 'finder'
-      ? 'That ID isn\u2019t for this site. Fieldwork IDs start with SF.'
-      : 'That ID isn\u2019t for this site. Second Leg IDs start with SC.');
+      ? 'That ID isn\u2019t for this site. Fieldwork IDs start with FW.'
+      : 'That ID isn\u2019t for this site. Second Leg IDs start with SL.');
     return;
   }
 
@@ -784,6 +784,14 @@ $('userInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('pwInp
 $('findInput').addEventListener('input', e => {
   term = e.target.value.trim();
   $('findClear').classList.toggle('hidden', !term);
+  // Searching from the add-lead form is a check for "have I got this
+  // already?", so it moves to the list rather than filtering nothing.
+  if(term && tab === 'add'){
+    tab = 'mine';
+    draw();
+    $('findInput').focus();
+    return;
+  }
   renderPanel();
 });
 $('findInput').addEventListener('keydown', e => {
@@ -998,8 +1006,6 @@ function drawHeadline(){
 }
 
 function drawTabs(){
-  // No list on the add-lead tab, so nothing to search.
-  $('find').classList.toggle('hidden', tab === 'add');
   const defs = me.role === 'closer'
     ? [['pool','The pile',pool().length],['mine','My leads',mineC().length]]
     : [['add','Add a lead',null],['mine','My leads',mineF().length]];
@@ -1008,7 +1014,7 @@ function drawTabs(){
   ).join('');
   $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => {
     tab = b.dataset.t;
-    term = ''; $('findInput').value = ''; $('findClear').classList.add('hidden');
+    if(tab === 'add'){ term = ''; $('findInput').value = ''; $('findClear').classList.add('hidden'); }
     draw();
   });
 }
