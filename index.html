@@ -265,6 +265,38 @@ body.c-role .stat.key b{color:var(--closer)}
   .stat b{font-size:22px}
 }
 
+/* ───── search ───── */
+.bar-row{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px;
+}
+.bar-row .tabs{margin-bottom:0}
+.find{position:relative;flex:1;min-width:190px;max-width:300px;margin-left:auto}
+.find input{
+  width:100%;padding:9px 30px 9px 32px;font-size:13.5px;border-radius:9px;
+  background:var(--sheet);border:1px solid var(--line-2);
+}
+.find input::-webkit-search-cancel-button{display:none}
+.find::before{
+  content:"";position:absolute;left:12px;top:50%;width:10px;height:10px;
+  margin-top:-6px;border:1.6px solid var(--ink-3);border-radius:50%;
+  pointer-events:none;
+}
+.find::after{
+  content:"";position:absolute;left:20px;top:50%;width:5px;height:1.6px;
+  margin-top:3px;background:var(--ink-3);transform:rotate(45deg);
+  transform-origin:left center;pointer-events:none;
+}
+.find-x{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  width:22px;height:22px;border-radius:6px;font-size:17px;line-height:1;
+  color:var(--ink-3);display:flex;align-items:center;justify-content:center;
+}
+.find-x:hover{color:var(--ink);background:var(--sheet-2)}
+@media (max-width:640px){
+  .bar-row{gap:10px}
+  .find{max-width:none;margin-left:0;flex:1 1 100%}
+}
+
 /* ───── tabs ───── */
 .tabs{
   display:inline-flex;gap:3px;padding:4px;margin-bottom:22px;
@@ -492,7 +524,13 @@ body.c-role .tab.on b{background:var(--closer)}
   </header>
   <main class="wrap">
     <div id="headline"></div>
-    <div class="tabs" id="tabs"></div>
+    <div class="bar-row">
+      <div class="tabs" id="tabs"></div>
+      <div class="find" id="find">
+        <input type="search" id="findInput" placeholder="Search name or number" autocomplete="off" spellcheck="false">
+        <button class="find-x hidden" id="findClear" aria-label="Clear search">&times;</button>
+      </div>
+    </div>
     <div id="panel"></div>
   </main>
 </div>
@@ -580,6 +618,7 @@ let unsub = null;   // array of listener handles
 let pendingRole = null;
 const openThreads = new Set();
 const confirming = new Set();   // leads showing 'sure?' right now
+let term = '';   // search box contents
 
 const $ = id => document.getElementById(id);
 const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -742,6 +781,21 @@ $('doWhoami').onclick = signIn;
 $('pwInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('doWhoami').click(); });
 $('userInput').addEventListener('keydown', e => { if(e.key === 'Enter') $('pwInput').focus(); });
 
+$('findInput').addEventListener('input', e => {
+  term = e.target.value.trim();
+  $('findClear').classList.toggle('hidden', !term);
+  renderPanel();
+});
+$('findInput').addEventListener('keydown', e => {
+  if(e.key === 'Escape'){ e.target.value = ''; term = ''; $('findClear').classList.add('hidden'); renderPanel(); }
+});
+$('findClear').onclick = () => {
+  $('findInput').value = ''; term = '';
+  $('findClear').classList.add('hidden');
+  renderPanel();
+  $('findInput').focus();
+};
+
 $('leave').onclick = leaveSite;   // onAuthStateChanged returns us to the door
 
 function enter(){
@@ -761,7 +815,7 @@ function enter(){
 // Each side asks for its own slice instead of the whole collection. Fieldwork
 // needs only what it added; second leg needs the unclaimed pile plus whatever
 // it is holding — which is two queries, merged here by document id.
-const PAGE = 300;
+const PAGE = 400;
 let parts = {};   // queryName -> {id: lead}
 
 function mergeParts(){
@@ -943,13 +997,19 @@ function drawHeadline(){
 }
 
 function drawTabs(){
+  // No list on the add-lead tab, so nothing to search.
+  $('find').classList.toggle('hidden', tab === 'add');
   const defs = me.role === 'closer'
     ? [['pool','The pile',pool().length],['mine','My leads',mineC().length]]
     : [['add','Add a lead',null],['mine','My leads',mineF().length]];
   $('tabs').innerHTML = defs.map(([k,label,n]) =>
     `<button class="tab ${tab===k?'on':''}" data-t="${k}">${label}${n===null?'':`<b>${ready?n:'–'}</b>`}</button>`
   ).join('');
-  $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
+  $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => {
+    tab = b.dataset.t;
+    term = ''; $('findInput').value = ''; $('findClear').classList.add('hidden');
+    draw();
+  });
 }
 
 function skeleton(n=3){
@@ -980,6 +1040,20 @@ function renderPanel(){
   }
 
   list = list.slice().sort((a,b) => ms(b.updatedAt) - ms(a.updatedAt));
+
+  // Search narrows whatever the tab already produced, matching the venue
+  // name or the digits of the phone, so "961" and "tejo" both work.
+  if(term){
+    const t = term.toLowerCase(), d = digits(term);
+    list = list.filter(l =>
+      (l.venue || '').toLowerCase().includes(t) ||
+      (d && (l.phoneDigits || '').includes(d))
+    );
+    if(!list.length){
+      empty = `<div class="empty"><div class="ring"></div><b>Nothing matches</b><p>No venue here with that name or number.</p></div>`;
+    }
+  }
+
   p.innerHTML = list.length ? `<div class="list">${list.map(card).join('')}</div>` : empty;
   wireCards();
 }
@@ -987,6 +1061,7 @@ function renderPanel(){
 // A live update from someone else shouldn't wipe out text being typed.
 function drawPanel(){
   const a = document.activeElement;
+  if(a && a.id === 'findInput') { renderPanel(); return; }   // safe to refresh the list under it
   if(a && a.tagName === 'TEXTAREA' && a.id.startsWith('say-')) return;
   if(tab === 'add' && a && a.tagName === 'INPUT' && ['fVenue','fPhone','fAddr'].includes(a.id)) return;
   renderPanel();
