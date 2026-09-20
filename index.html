@@ -540,6 +540,7 @@ window.FIREBASE = {
       onSnapshot: fs.onSnapshot, runTransaction: fs.runTransaction,
       serverTimestamp: fs.serverTimestamp, arrayUnion: fs.arrayUnion,
       query: fs.query, orderBy: fs.orderBy, deleteDoc: fs.deleteDoc,
+      where: fs.where, limit: fs.limit,
       auth: au.getAuth(app),
       signIn: au.signInWithEmailAndPassword,
       signOut: au.signOut,
@@ -575,7 +576,7 @@ let me = null;          // {role:'finder'|'closer', name}
 let leads = [];
 let ready = false;
 let tab = null;
-let unsub = null;
+let unsub = null;   // array of listener handles
 let pendingRole = null;
 const openThreads = new Set();
 const confirming = new Set();   // leads showing 'sure?' right now
@@ -757,20 +758,61 @@ function enter(){
    DATA — one document per lead, so two people saving at the same
    time can never overwrite each other's work.
    ══════════════════════════════════════════════════════════════ */
+// Each side asks for its own slice instead of the whole collection. Fieldwork
+// needs only what it added; second leg needs the unclaimed pile plus whatever
+// it is holding — which is two queries, merged here by document id.
+const PAGE = 300;
+let parts = {};   // queryName -> {id: lead}
+
+function mergeParts(){
+  const byId = {};
+  Object.values(parts).forEach(set => Object.assign(byId, set));
+  leads = Object.values(byId);
+  ready = true;
+  draw();
+}
+
+function watch(name, q){
+  parts[name] = {};
+  return FB.onSnapshot(q, snap => {
+    const set = {};
+    snap.docs.forEach(d => { set[d.id] = { id:d.id, ...d.data() }; });
+    parts[name] = set;
+    mergeParts();
+  }, e => {
+    console.error(name, e);
+    // A missing composite index reports as failed-precondition and the console
+    // error carries a one-click link to create it.
+    toast(e.code === 'failed-precondition'
+      ? 'A database index is still building — try again shortly.'
+      : "Lost the connection — changes may not be saving.");
+  });
+}
+
 function listen(){
   stop();
   ready = false;
-  if(!fbReady){ $('panel').innerHTML = skeleton(); return; }  // resumes on fb-ready
-  unsub = FB.onSnapshot(FB.query(leadsCol, FB.orderBy('addedAt','desc')), snap => {
-    leads = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-    ready = true;
-    draw();
-  }, e => {
-    console.error(e);
-    toast("Lost the connection — changes may not be saving.");
-  });
+  if(!fbReady){ $('panel').innerHTML = skeleton(); return; }   // resumes on fb-ready
+
+  if(me.role === 'finder'){
+    unsub = [ watch('mine', FB.query(leadsCol,
+      FB.where('addedByName','==', me.name),
+      FB.orderBy('addedAt','desc'), FB.limit(PAGE))) ];
+  }else{
+    unsub = [
+      watch('pile', FB.query(leadsCol,
+        FB.where('status','==','new'),
+        FB.orderBy('addedAt','desc'), FB.limit(PAGE))),
+      watch('held', FB.query(leadsCol,
+        FB.where('claimedByName','==', me.name),
+        FB.orderBy('updatedAt','desc'), FB.limit(PAGE)))
+    ];
+  }
 }
-function stop(){ if(unsub){ unsub(); unsub = null; } leads = []; ready = false; openThreads.clear(); }
+function stop(){
+  if(unsub){ unsub.forEach(u => u()); unsub = null; }
+  parts = {}; leads = []; ready = false; openThreads.clear();
+}
 
 async function addLead(venue, phone, address){
   await FB.addDoc(leadsCol, {
@@ -985,8 +1027,8 @@ function wireAddForm(){
     if(d.length < 7){ box.innerHTML = ''; return; }
     const hit = leads.find(l => l.phoneDigits === d);
     box.innerHTML = hit ? `<div class="warn-box">
-      <b>${esc(hit.venue)} is already here</b>
-      <p>Added by ${esc(hit.addedByName)} ${ago(hit.addedAt)} — ${esc(STATUS[hit.status] || hit.status)}${hit.claimedByName ? `, with ${esc(hit.claimedByName)}` : ''}.</p>
+      <b>You already added ${esc(hit.venue)}</b>
+      <p>${ago(hit.addedAt)} \u2014 ${esc(STATUS[hit.status] || hit.status)}${hit.claimedByName ? `, with ${esc(hit.claimedByName)}` : ''}.</p>
     </div>` : '';
   });
 
@@ -997,7 +1039,7 @@ function wireAddForm(){
     if(!v){ err.textContent = 'Give the venue a name.'; err.classList.remove('hidden'); venue.focus(); return; }
     if(digits(p).length < 7){ err.textContent = 'A working phone number is the whole point — add one.'; err.classList.remove('hidden'); phone.focus(); return; }
     if(leads.some(l => l.phoneDigits === digits(p))){
-      err.textContent = 'That number is already on the pile.'; err.classList.remove('hidden'); return;
+      err.textContent = 'You have already added that number.'; err.classList.remove('hidden'); return;
     }
     err.classList.add('hidden');
     btn.disabled = true;
