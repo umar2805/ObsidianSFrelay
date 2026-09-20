@@ -815,7 +815,8 @@ function enter(){
 // Each side asks for its own slice instead of the whole collection. Fieldwork
 // needs only what it added; second leg needs the unclaimed pile plus whatever
 // it is holding — which is two queries, merged here by document id.
-const PAGE = 400;
+const PAGE = 400;        // a person's own leads
+const PILE = 1000;       // the unclaimed backlog, which runs much larger
 let parts = {};   // queryName -> {id: lead}
 
 function mergeParts(){
@@ -856,7 +857,7 @@ function listen(){
     unsub = [
       watch('pile', FB.query(leadsCol,
         FB.where('status','==','new'),
-        FB.orderBy('addedAt','desc'), FB.limit(PAGE))),
+        FB.orderBy('addedAt','desc'), FB.limit(PILE))),
       watch('held', FB.query(leadsCol,
         FB.where('claimedByName','==', me.name),
         FB.orderBy('updatedAt','desc'), FB.limit(PAGE)))
