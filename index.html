@@ -36,6 +36,8 @@
   --finder-wash:#EAEDF8;
   --closer:#0C6446;
   --closer-wash:#E6F0EA;
+  --admin:#6B3FA0;
+  --admin-wash:#F0EAF8;
 
   --amber:#8A5A06;
   --amber-wash:#F7EFE0;
@@ -65,6 +67,7 @@ body::before{
   background:radial-gradient(90% 60% at 50% -10%, rgba(43,63,148,.05), transparent 70%);
 }
 body.c-role::before{background:radial-gradient(90% 60% at 50% -10%, rgba(12,100,70,.05), transparent 70%);}
+body.a-role::before{background:radial-gradient(90% 60% at 50% -10%, rgba(107,63,160,.05), transparent 70%);}
 
 .bar{
   position:sticky;top:0;z-index:40;
@@ -82,6 +85,7 @@ body.c-role::before{background:radial-gradient(90% 60% at 50% -10%, rgba(12,100,
   text-transform:uppercase;color:var(--finder);
 }
 body.c-role .mark i{color:var(--closer)}
+body.a-role .mark i{color:var(--admin)}
 .bar-right{margin-left:auto;display:flex;align-items:center;gap:12px;min-width:0}
 .who{
   display:flex;align-items:center;gap:8px;min-width:0;
@@ -90,6 +94,7 @@ body.c-role .mark i{color:var(--closer)}
   background:var(--finder-wash);color:var(--finder);
 }
 body.c-role .who{background:var(--closer-wash);color:var(--closer)}
+body.a-role .who{background:var(--admin-wash);color:var(--admin)}
 .who b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:26vw}
 .dot{width:6px;height:6px;border-radius:50%;flex:none;background:currentColor}
 .dot.f,.dot.c{background:currentColor}
@@ -253,6 +258,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.55}
 }
 .stat.key b{color:var(--finder)}
 body.c-role .stat.key b{color:var(--closer)}
+body.a-role .stat.key b{color:var(--admin)}
 .stat small{
   display:block;font-size:10px;font-weight:600;letter-spacing:.1em;
   text-transform:uppercase;color:var(--ink-3);margin-top:6px;white-space:nowrap;
@@ -264,6 +270,48 @@ body.c-role .stat.key b{color:var(--closer)}
   .stat{text-align:left}
   .stat b{font-size:22px}
 }
+
+/* ───── admin ───── */
+.admin-strip{
+  display:flex;flex-wrap:wrap;gap:8px 26px;
+  margin:-8px 0 22px;padding-bottom:18px;
+  border-bottom:1px solid var(--line);
+  font-size:13px;color:var(--ink-2);
+}
+.admin-strip b{
+  font-weight:700;color:var(--ink);margin-right:4px;font-variant-numeric:tabular-nums;
+}
+.ptable{display:grid;gap:2px}
+.prow{
+  display:grid;grid-template-columns:1.2fr repeat(3,1fr) auto;
+  align-items:center;gap:12px;
+  padding:11px 0;border-bottom:1px solid var(--line);
+}
+.prow:last-child{border-bottom:none}
+.pid{font-weight:700;font-size:13.5px;letter-spacing:.05em}
+.prow span b{display:block;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.prow span small{
+  display:block;font-size:9.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:3px;
+}
+.prate{
+  font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;
+  background:var(--admin-wash);color:var(--admin);justify-self:end;
+}
+@media (max-width:640px){
+  .prow{grid-template-columns:1fr 1fr 1fr;gap:8px 12px}
+  .pid{grid-column:1 / -1}
+  .prate{grid-column:1 / -1;justify-self:start}
+}
+.thread.hist{gap:0}
+.hrow{
+  display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
+  padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;
+}
+.hrow:last-child{border-bottom:none}
+.hwho{font-weight:700;letter-spacing:.04em}
+.hact{color:var(--ink-2)}
+.hwhen{margin-left:auto;color:var(--ink-3);font-size:12px}
 
 /* ───── search ───── */
 .bar-row{
@@ -318,6 +366,7 @@ body.c-role .stat.key b{color:var(--closer)}
 .tab.on{background:var(--sheet);color:var(--ink);box-shadow:var(--shadow)}
 .tab.on b{background:var(--finder);color:#fff}
 body.c-role .tab.on b{background:var(--closer)}
+body.a-role .tab.on b{background:var(--admin)}
 
 /* ───── cards ───── */
 .card{
@@ -618,6 +667,7 @@ let unsub = null;   // array of listener handles
 let pendingRole = null;
 const openThreads = new Set();
 const confirming = new Set();   // leads showing 'sure?' right now
+const openLogs = new Set();     // leads showing their history
 let term = '';   // search box contents
 
 const $ = id => document.getElementById(id);
@@ -639,6 +689,11 @@ function ms(v){
   if(v.toMillis) return v.toMillis();
   return 0;
 }
+function isToday(v){
+  const t = ms(v);
+  return !!t && new Date(t).toDateString() === new Date().toDateString();
+}
+
 function ago(v){
   const t = ms(v);
   if(!t) return 'just now';
@@ -723,6 +778,7 @@ function leaveSite(){
 // turned into one. Staff never see or type the domain.
 const ID_DOMAIN = '@relay.local';
 const ID_PREFIX = { finder:'FW', closer:'SL' }[forcedRole];   // FW fieldwork, SL second leg
+const ADMIN_PREFIX = 'AD';   // the owner, who can sign in at either entrance
 const idToEmail = id => id.trim().toLowerCase() + ID_DOMAIN;
 const emailToId = em => (em || '').split('@')[0].toUpperCase();
 
@@ -732,7 +788,7 @@ async function signIn(){
   if(!fbReady){ doorError('Still connecting \u2014 give it a second and try again.'); return; }
 
   // An ID from the other side is a wrong door, not a wrong password — say so.
-  if(!id.startsWith(ID_PREFIX)){
+  if(!id.startsWith(ID_PREFIX) && !id.startsWith(ADMIN_PREFIX)){
     doorError(forcedRole === 'finder'
       ? 'That ID isn\u2019t for this site. Fieldwork IDs start with FW.'
       : 'That ID isn\u2019t for this site. Second Leg IDs start with SL.');
@@ -764,6 +820,11 @@ function watchAuth(){
     }
     $('pwInput').value = '';
     const id = emailToId(user.email);
+    if(id.startsWith(ADMIN_PREFIX)){        // the owner sees everything
+      me = { role:'admin', name:id, uid:user.uid };
+      enter();
+      return;
+    }
     if(!id.startsWith(ID_PREFIX)){
       // Both sites can sit on one address and share a single session, so an ID
       // from the other side just stops here. Signing out would kick the other
@@ -807,9 +868,10 @@ $('findClear').onclick = () => {
 $('leave').onclick = leaveSite;   // onAuthStateChanged returns us to the door
 
 function enter(){
-  tab = me.role === 'finder' ? 'add' : 'pool';
+  tab = me.role === 'admin' ? 'board' : (me.role === 'finder' ? 'add' : 'pool');
   document.body.classList.toggle('c-role', me.role === 'closer');
-  $('mark').innerHTML = `Relay <i>${me.role === 'finder' ? 'Fieldwork' : 'Second Leg'}</i>`;
+  document.body.classList.toggle('a-role', me.role === 'admin');
+  $('mark').innerHTML = `Relay <i>${ {finder:'Fieldwork', closer:'Second Leg', admin:'Admin'}[me.role] }</i>`;
   $('who').innerHTML = `<span class="dot"></span><b>${esc(me.name)}</b>`;
   show('app');
   listen();
@@ -825,6 +887,7 @@ function enter(){
 // it is holding — which is two queries, merged here by document id.
 const PAGE = 400;        // a person's own leads
 const PILE = 1000;       // the unclaimed backlog, which runs much larger
+const ADMIN_PAGE = 1000; // the owner's overview
 let parts = {};   // queryName -> {id: lead}
 
 function mergeParts(){
@@ -857,7 +920,10 @@ function listen(){
   ready = false;
   if(!fbReady){ $('panel').innerHTML = skeleton(); return; }   // resumes on fb-ready
 
-  if(me.role === 'finder'){
+  if(me.role === 'admin'){
+    unsub = [ watch('all', FB.query(leadsCol,
+      FB.orderBy('updatedAt','desc'), FB.limit(ADMIN_PAGE))) ];
+  }else if(me.role === 'finder'){
     unsub = [ watch('mine', FB.query(leadsCol,
       FB.where('addedByName','==', me.name),
       FB.orderBy('addedAt','desc'), FB.limit(PAGE))) ];
@@ -874,7 +940,7 @@ function listen(){
 }
 function stop(){
   if(unsub){ unsub.forEach(u => u()); unsub = null; }
-  parts = {}; leads = []; ready = false; openThreads.clear();
+  parts = {}; leads = []; ready = false; openThreads.clear(); openLogs.clear();
 }
 
 async function addLead(venue, phone, address){
@@ -914,13 +980,17 @@ async function claim(id){
 
 async function release(id){
   await FB.updateDoc(FB.doc(db, 'leads', id), {
-    status:'new', claimedByName:null, claimedAt:null, updatedAt:FB.serverTimestamp()
+    status:'new', claimedByName:null, claimedAt:null, updatedAt:FB.serverTimestamp(),
+    log: FB.arrayUnion({ at:Date.now(), by:me.name, act:'released' })
   });
   toast('Back on the pile for someone else.');
 }
 
 async function setOutcome(id, status){
-  await FB.updateDoc(FB.doc(db, 'leads', id), { status, updatedAt:FB.serverTimestamp() });
+  await FB.updateDoc(FB.doc(db, 'leads', id), {
+    status, updatedAt:FB.serverTimestamp(),
+    log: FB.arrayUnion({ at:Date.now(), by:me.name, act:status })
+  });
 }
 
 // Only the finder who added a venue can delete it, and only while nobody has
@@ -928,6 +998,7 @@ async function setOutcome(id, status){
 // never be able to erase someone else's work — they mark it declined or put
 // it back on the pile instead.
 function canDelete(l){
+  if(me.role === 'admin') return true;   // the owner clears out anything
   if(me.role !== 'finder') return false;
   return norm(l.addedByName) === norm(me.name) && l.status === 'new';
 }
@@ -961,6 +1032,37 @@ const mineC   = () => leads.filter(l => l.status !== 'new' && norm(l.claimedByNa
 const mineF   = () => leads.filter(l => norm(l.addedByName) === norm(me.name));
 const working = () => leads.filter(l => l.status !== 'new');   // kept for counts
 
+// Claimed a while ago and untouched since — someone sitting on leads they
+// aren't calling. Also the oldest thing still waiting on the pile.
+const STALE_DAYS = 3;
+const daysAgo = n => Date.now() - n * 86400000;
+const stale = () => leads.filter(l =>
+  (l.status === 'claimed' && ms(l.updatedAt) && ms(l.updatedAt) < daysAgo(STALE_DAYS)) ||
+  (l.status === 'new' && ms(l.addedAt) && ms(l.addedAt) < daysAgo(STALE_DAYS))
+);
+
+// Per-person tallies, split by which prefix the ID carries.
+function people(){
+  const rows = {};
+  const row = id => rows[id] || (rows[id] = { id, added:0, pickedUp:0, claimed:0, holding:0, sold:0, declined:0 });
+  leads.forEach(l => {
+    if(l.addedByName){
+      const r = row(l.addedByName);
+      r.added++;
+      if(l.status !== 'new') r.pickedUp++;
+      if(l.status === 'sold') r.soldFrom = (r.soldFrom || 0) + 1;
+    }
+    if(l.claimedByName){
+      const r = row(l.claimedByName);
+      r.claimed++;
+      if(l.status === 'claimed') r.holding++;
+      if(l.status === 'sold') r.sold++;
+      if(l.status === 'declined') r.declined++;
+    }
+  });
+  return Object.values(rows).sort((a,b) => a.id.localeCompare(b.id));
+}
+
 function draw(){
   if(!me) return;
   drawHeadline();
@@ -971,6 +1073,35 @@ function draw(){
 function drawHeadline(){
   const h = $('headline');
   const num = v => ready ? v : '\u2014';
+
+  if(me.role === 'admin'){
+    const by = k => leads.filter(l => l.status === k).length;
+    const today = leads.filter(l => isToday(l.addedAt)).length;
+    const calledToday = leads.filter(l => l.status !== 'new' && isToday(l.updatedAt)).length;
+    const oldest = leads.filter(l => l.status === 'new').map(l => ms(l.addedAt)).filter(Boolean).sort()[0];
+    h.innerHTML = `<div class="page-head">
+      <div class="page-title">
+        <h1>The whole board</h1>
+        <p>${ready && oldest
+              ? 'Oldest venue still waiting: ' + ago(oldest) + '.'
+              : 'Everything both sides have done.'}</p>
+      </div>
+      <div class="stats">
+        <div class="stat key"><b>${num(leads.length)}</b><small>Leads</small></div>
+        <div class="stat"><b>${num(by('new'))}</b><small>Waiting</small></div>
+        <div class="stat"><b>${num(by('claimed'))}</b><small>On calls</small></div>
+        <div class="stat"><b>${num(by('sold'))}</b><small>Sold</small></div>
+      </div>
+    </div>
+    <div class="admin-strip">
+      <span><b>${num(today)}</b> added today</span>
+      <span><b>${num(calledToday)}</b> worked today</span>
+      <span><b>${num(by('call_back'))}</b> to call back</span>
+      <span><b>${num(by('interested'))}</b> interested</span>
+      <span><b>${num(by('declined'))}</b> declined</span>
+    </div>`;
+    return;
+  }
 
   if(me.role === 'closer'){
     const waiting = pool().length;
@@ -1006,9 +1137,11 @@ function drawHeadline(){
 }
 
 function drawTabs(){
-  const defs = me.role === 'closer'
-    ? [['pool','The pile',pool().length],['mine','My leads',mineC().length]]
-    : [['add','Add a lead',null],['mine','My leads',mineF().length]];
+  const defs = me.role === 'admin'
+    ? [['board','Everything',leads.length],['people','People',null],['stale','Needs a look',stale().length]]
+    : me.role === 'closer'
+      ? [['pool','The pile',pool().length],['mine','My leads',mineC().length]]
+      : [['add','Add a lead',null],['mine','My leads',mineF().length]];
   $('tabs').innerHTML = defs.map(([k,label,n]) =>
     `<button class="tab ${tab===k?'on':''}" data-t="${k}">${label}${n===null?'':`<b>${ready?n:'–'}</b>`}</button>`
   ).join('');
@@ -1017,6 +1150,44 @@ function drawTabs(){
     if(tab === 'add'){ term = ''; $('findInput').value = ''; $('findClear').classList.add('hidden'); }
     draw();
   });
+}
+
+function peoplePanel(){
+  const rows = people();
+  if(!rows.length) return `<div class="empty"><div class="ring"></div><b>Nobody yet</b><p>Counts appear once your team starts working.</p></div>`;
+
+  const fw = rows.filter(r => r.id.startsWith('FW'));
+  const sl = rows.filter(r => r.id.startsWith('SL'));
+
+  const table = (title, head, body, list) => !list.length ? '' : `
+    <div class="card">
+      <h2>${title}</h2>
+      <p class="note">${head}</p>
+      <div class="ptable">
+        ${body}
+      </div>
+    </div>`;
+
+  const fwBody = fw.map(r => `
+    <div class="prow">
+      <span class="pid">${esc(r.id)}</span>
+      <span><b>${r.added}</b><small>Added</small></span>
+      <span><b>${r.pickedUp}</b><small>Picked up</small></span>
+      <span><b>${r.soldFrom || 0}</b><small>Sold</small></span>
+      <span class="prate">${r.added ? Math.round((r.soldFrom || 0) / r.added * 100) : 0}%</span>
+    </div>`).join('');
+
+  const slBody = sl.map(r => `
+    <div class="prow">
+      <span class="pid">${esc(r.id)}</span>
+      <span><b>${r.claimed}</b><small>Claimed</small></span>
+      <span><b>${r.holding}</b><small>Holding</small></span>
+      <span><b>${r.sold}</b><small>Sold</small></span>
+      <span class="prate">${r.claimed ? Math.round(r.sold / r.claimed * 100) : 0}%</span>
+    </div>`).join('');
+
+  return table('Fieldwork', 'How many venues each one found, and what became of them.', fwBody, fw)
+       + table('Second Leg', 'How many each one took on, and how many closed.', slBody, sl);
 }
 
 function skeleton(n=3){
@@ -1034,10 +1205,19 @@ function renderPanel(){
   if(tab === 'add'){ p.innerHTML = addForm(); wireAddForm(); return; }
   if(!ready){ p.innerHTML = skeleton(); return; }
 
+  if(tab === 'people'){ p.innerHTML = peoplePanel(); return; }
+
+
   let list, empty;
   if(tab === 'pool'){
     list = pool();
     empty = `<div class="empty"><div class="ring"></div><b>Nothing waiting</b><p>Every lead has been picked up. New ones appear here the moment someone adds them.</p></div>`;
+  }else if(tab === 'board'){
+    list = leads.slice();
+    empty = `<div class="empty"><div class="ring"></div><b>Nothing on the board</b><p>Leads appear here as soon as fieldwork adds them.</p></div>`;
+  }else if(tab === 'stale'){
+    list = stale();
+    empty = `<div class="empty"><div class="ring"></div><b>Nothing needs a look</b><p>No venue has been sitting untouched for more than ${STALE_DAYS} days.</p></div>`;
   }else if(me.role === 'closer'){
     list = mineC();
     empty = `<div class="empty"><div class="ring"></div><b>Nothing claimed yet</b><p>Open the pile and take the one at the top.</p></div>`;
@@ -1168,9 +1348,20 @@ function card(l){
     `<button class="oc ${o.tone} ${l.status===o.k?'on':''}" data-act="oc" data-id="${l.id}" data-k="${o.k}">${o.label}</button>`
   ).join('')}</div>` : '';
 
+  const logN = (l.log || []).length;
+  const showingLog = openLogs.has(l.id);
+  const logBtn = (me.role === 'admin' && logN)
+    ? `<button class="btn quiet sm" data-act="log" data-id="${l.id}">${showingLog ? 'Hide history' : `History (${logN})`}</button>`
+    : '';
+
+  // The owner can free a lead someone claimed and abandoned.
+  const unstick = (me.role === 'admin' && l.claimedByName)
+    ? `<button class="btn quiet sm" data-act="unstick" data-id="${l.id}">Unstick</button>`
+    : '';
+
   const threadBtn = (n || canTalk)
     ? `<button class="btn quiet sm" data-act="thread" data-id="${l.id}">${open ? 'Hide notes' : (n ? `Notes (${n})` : 'Add a note')}</button>`
-    : '';
+    : (me.role === 'admin' && n ? `<button class="btn quiet sm" data-act="thread" data-id="${l.id}">${open ? 'Hide notes' : `Notes (${n})`}</button>` : '');
 
   const delBtn = !canDelete(l) ? ''
     : confirming.has(l.id)
@@ -1190,10 +1381,43 @@ function card(l){
     </div>
     <a class="lead-tel" href="${wa(l.phone)}" target="_blank" rel="noopener">${esc(l.phone)}</a>
     ${outcomes}
-    ${(actions || threadBtn || delBtn) ? `<div class="lead-actions">${actions}${threadBtn}${delBtn}</div>` : ''}
+    ${(actions || threadBtn || logBtn || unstick || delBtn) ? `<div class="lead-actions">${actions}${threadBtn}${logBtn}${unstick}${delBtn}</div>` : ''}
     ${open ? thread(l, canTalk) : ''}
+    ${showingLog ? history(l) : ''}
     <div class="lead-foot">${foot.map(f => `<span>${f}</span>`).join('')}</div>
   </article>`;
+}
+
+const ACT = {
+  added:'added it', claimed:'claimed it', released:'put it back',
+  interested:'marked Interested', call_back:'marked Call back',
+  sold:'marked Sold', declined:'marked Not interested',
+  unstuck:'was unstuck by the owner'
+};
+
+function history(l){
+  const rows = (l.log || []).slice().sort((a,b) => (a.at||0) - (b.at||0));
+  return `<div class="thread hist">${rows.map(e => `
+    <div class="hrow">
+      <span class="hwho">${esc(e.by)}</span>
+      <span class="hact">${esc(ACT[e.act] || e.act)}</span>
+      <span class="hwhen">${ago(e.at)}</span>
+    </div>`).join('')}</div>`;
+}
+
+async function unstick(id){
+  const l = leads.find(x => x.id === id);
+  if(!l) return;
+  try{
+    await FB.updateDoc(FB.doc(db, 'leads', id), {
+      status:'new', claimedByName:null, claimedAt:null, updatedAt:FB.serverTimestamp(),
+      log: FB.arrayUnion({ at:Date.now(), by:me.name, act:'unstuck' })
+    });
+    toast(`${l.venue} is back on the pile.`);
+  }catch(e){
+    console.error(e);
+    toast("Couldn\u2019t unstick that \u2014 check the rules allow it.");
+  }
 }
 
 function thread(l, canTalk){
@@ -1225,6 +1449,11 @@ function wireCards(){
         renderPanel();
         const ta = $('say-' + id); if(ta) ta.focus();
       }
+      else if(act === 'log'){
+        openLogs.has(id) ? openLogs.delete(id) : openLogs.add(id);
+        renderPanel();
+      }
+      else if(act === 'unstick'){ b.disabled = true; await unstick(id); }
       else if(act === 'del'){ confirming.add(id); renderPanel(); }
       else if(act === 'delno'){ confirming.delete(id); renderPanel(); }
       else if(act === 'delyes'){ b.disabled = true; await removeLead(id); }
